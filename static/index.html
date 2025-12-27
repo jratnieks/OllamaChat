@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local LLM Coding Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Local LLM Coding Assistant</h1>
+        </header>
+        
+        <div class="main-layout">
+            <div class="left-panel">
+                <div class="section">
+                    <h2>Configuration</h2>
+                    
+                    <div class="control-group">
+                        <label for="model-select">Model:</label>
+                        <select id="model-select">
+                            <option value="">Loading models...</option>
+                        </select>
+                        <small class="hint" id="model-hint">Models must be downloaded in Ollama first. See README for instructions.</small>
+                        <div id="no-models-message" style="display: none; margin-top: 8px; padding: 8px; background-color: #3c3c3c; border-radius: 4px; font-size: 12px;">
+                            <strong>No models found.</strong> Download a model first:
+                            <code style="display: block; margin-top: 4px; padding: 4px; background-color: #1e1e1e; border-radius: 2px;">ollama pull qwen2.5-coder:7b</code>
+                            <a href="#" id="refresh-models" style="color: #4ec9b0; text-decoration: underline; cursor: pointer; margin-top: 4px; display: inline-block;">Refresh</a>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="project-folder">Project Folder:</label>
+                        <div class="folder-input-group">
+                            <input type="text" id="project-folder" placeholder="Enter project folder path (e.g., C:\Projects\MyApp)" autocomplete="off">
+                            <input type="file" id="folder-picker" webkitdirectory directory style="display: none;">
+                            <button id="browse-folder-btn" type="button">Browse</button>
+                        </div>
+                        <small class="hint">Leave empty to use current directory. Click Browse to select a folder, or paste the path directly.</small>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="include-readme" checked>
+                            Include README.md
+                        </label>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="include-tree" checked>
+                            Include directory tree
+                        </label>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="include-all-files">
+                            Include all files in project folder
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2>System Prompt</h2>
+                    <textarea id="system-prompt" placeholder="Optional: Override the default coding assistant prompt. Leave empty to use the default."></textarea>
+                    <small class="hint">Default prompt tells the model to be a helpful coding assistant with access to your project files.</small>
+                </div>
+                
+                <div class="section">
+                    <h2>Selected Files</h2>
+                    <div class="file-input-group">
+                        <input type="text" id="file-input" placeholder="Enter file path (e.g., src/main.py)">
+                        <button id="add-file-btn">Add</button>
+                    </div>
+                    <div id="selected-files-list"></div>
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <div class="chat-section">
+                    <div id="chat-messages"></div>
+                    <div class="chat-input-group">
+                        <textarea id="chat-input" placeholder="Type your message... (Enter to send, Shift+Enter for new line)"></textarea>
+                        <button id="send-btn">Send</button>
+                    </div>
+                </div>
+                
+                <div class="debug-panel">
+                    <div class="debug-header">
+                        <h3>Debug: What the LLM sees</h3>
+                        <button id="toggle-debug">Hide</button>
+                    </div>
+                    <div id="debug-content" class="debug-content">
+                        <div class="debug-item">
+                            <strong>Project Root:</strong> <span id="debug-project-root">-</span>
+                        </div>
+                        <div class="debug-item">
+                            <strong>Included Items:</strong> <span id="debug-included">-</span>
+                        </div>
+                        <div class="debug-item">
+                            <strong>Context Length:</strong> <span id="debug-context-length">-</span>
+                        </div>
+                        <div class="debug-item">
+                            <strong>System Prompt:</strong>
+                            <pre id="debug-system-prompt">-</pre>
+                        </div>
+                        <div class="debug-item">
+                            <strong>Full Context Preview:</strong>
+                            <pre id="debug-context-preview">-</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>
+

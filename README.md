@@ -1,158 +1,128 @@
-# Local LLM Coding Assistant
+# OllamaChat
 
-A local coding assistant backend + UI that connects to Ollama and provides OpenAI-compatible endpoints for use with Cursor or other tools.
+A simple, local LLM chat interface that connects to Ollama. Search and download models directly from the Ollama library, upload files for analysis, and chat with any model.
 
 ## Features
 
 - **100% Local**: Runs entirely on your machine, no cloud services
 - **Ollama Integration**: Uses Ollama as the model runtime
+- **Model Search**: Search the Ollama library and download models directly from the UI
+- **File Upload**: Upload text/code files for the LLM to analyze
 - **OpenAI-Compatible API**: Exposes `/v1/chat/completions` and `/v1/models` endpoints
-- **Project-Aware Context**: Automatically injects README.md, directory tree, and selected source files
-- **Minimal Web UI**: Simple interface for model selection, system prompt editing, file selection, and chat
+- **Clean Web UI**: Simple interface for chatting with local LLMs
 
 ## Requirements
 
 - Python 3.8+
 - [Ollama](https://ollama.ai/) installed and running locally
-- At least one model pulled in Ollama (e.g., `qwen2.5-coder:7b`)
 
-## Setup
+## Quick Start
 
 1. **Install Ollama** (if not already installed):
    - Visit https://ollama.ai/ and follow installation instructions
-   - Start Ollama service (usually runs automatically)
+   - Start Ollama (runs automatically after install)
 
-2. **Pull a coding model** (if not already done):
-   
-   **Recommended coding models** (best to good):
+2. **Clone and setup**:
    ```bash
-   # Top tier - best for coding tasks
-   ollama pull qwen2.5-coder:7b          # Excellent code generation, fast
-   ollama pull qwen2.5-coder:32b         # Larger, more capable version
-   ollama pull deepseek-coder:6.7b       # Strong code understanding and generation
-   ollama pull deepseek-coder:33b        # Most capable coding model
-   
-   # Good alternatives
-   ollama pull codellama:7b              # Meta's coding model, well-tested
-   ollama pull codellama:13b             # Larger version
-   ollama pull codellama:34b             # Largest version
-   ollama pull starcoder2:15b            # BigCode's model, good for code completion
-   ollama pull wizardcoder:7b            # Fine-tuned for coding tasks
-   
-   # General models that are also good at coding
-   ollama pull mistral:7b                # Fast, general-purpose, good at code
-   ollama pull llama3.1:8b               # Meta's general model, decent coding
-   ollama pull llama3.1:70b              # Larger, more capable
-   ```
-   
-   **Quick start** (recommended for most users):
-   ```bash
-   ollama pull qwen2.5-coder:7b
-   ```
-   
-   Note: Larger models (32b, 33b, 34b, 70b) require more RAM but provide better code quality. Start with 7b models if you have limited resources.
-
-3. **Install Python dependencies**:
-   ```bash
+   git clone https://github.com/jratnieks/OllamaChat.git
+   cd OllamaChat
+   python -m venv venv
+   venv\Scripts\activate  # Windows
+   # source venv/bin/activate  # macOS/Linux
    pip install -r requirements.txt
    ```
 
-## Running
-
-1. **Start the FastAPI server**:
+3. **Run the server**:
    ```bash
    python main.py
    ```
    
-   Or using uvicorn directly:
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 8000
-   ```
+   The browser will open automatically to http://127.0.0.1:8000
 
-2. **Open the web UI**:
-   - Navigate to http://127.0.0.1:8000 or http://localhost:8000 in your browser
-
-3. **Use with Cursor** (optional):
-   - Configure Cursor to use `http://localhost:8000/v1` as the OpenAI API endpoint
-   - The assistant will automatically inject project context when available
+4. **Download a model** (if you don't have any):
+   - Use the search box to find models (e.g., "llama", "phi", "qwen")
+   - Click on a model to download it
+   - Or enter a model name in the "Pull Model" field
 
 ## Usage
 
 ### Web UI
 
-1. **Select a model** from the dropdown (models are loaded from Ollama)
-2. **Configure context**:
-   - Toggle "Include README.md" and "Include directory tree" checkboxes
-   - Add files to the context by entering file paths and clicking "Add File"
-3. **Set system prompt** (optional): Enter a custom system prompt in the textarea
-4. **Chat**: Type your message and click "Send" or press Ctrl+Enter
+1. **Search for models**: Type in the search box to find models from the Ollama library
+2. **Select a model**: Choose from your downloaded models in the dropdown
+3. **Upload files** (optional): Upload text/code files for the LLM to analyze
+4. **Set system prompt** (optional): Customize the assistant's behavior with presets or custom text
+5. **Chat**: Type your message and press Enter to send
 
-### API Endpoints
+### Recommended Models
 
-#### `GET /v1/models`
-List available models from Ollama.
+| Model | Size | Best For |
+|-------|------|----------|
+| `llama3.2:3b` | ~2GB | Fast general chat |
+| `llama3.1:8b` | ~4.7GB | General purpose |
+| `qwen2.5-coder:7b` | ~4.4GB | Coding tasks |
+| `phi3:mini` | ~2.2GB | Fast, lightweight |
+| `mistral:7b` | ~4.1GB | General purpose |
 
-#### `POST /v1/chat/completions`
-Create a chat completion. Request body:
+Download any model via the UI or command line:
+```bash
+ollama pull llama3.2:3b
+```
+
+## API Endpoints
+
+### `GET /v1/models`
+List downloaded models (OpenAI-compatible).
+
+### `POST /v1/chat/completions`
+Create a chat completion (OpenAI-compatible). Request body:
 ```json
 {
-  "model": "qwen2.5-coder:7b",
+  "model": "llama3.2:3b",
   "messages": [
-    {"role": "user", "content": "What does this code do?"}
+    {"role": "user", "content": "Hello!"}
   ],
-  "selected_files": ["src/main.py"],
-  "include_readme": true,
-  "include_tree": true,
-  "system_prompt": "You are a helpful coding assistant."
+  "stream": true
 }
 ```
 
-#### `POST /api/context/files`
-Get contents of multiple files. Request body:
+### `GET /api/models/search?q=llama`
+Search for models in the Ollama library.
+
+### `POST /api/models/pull`
+Download a model from Ollama. Request body:
 ```json
 {
-  "files": ["src/main.py", "README.md"]
+  "model": "llama3.2:3b"
 }
 ```
-
-#### `GET /api/context/tree`
-Get directory tree representation.
-
-#### `GET /api/context/readme`
-Get README.md contents.
 
 ## Project Structure
 
 ```
-.
-├── main.py              # FastAPI server with OpenAI-compatible endpoints
-├── ollama_client.py     # Ollama API client wrapper
-├── context_builder.py   # Project context injection logic
+OllamaChat/
+├── main.py              # FastAPI server
+├── ollama_client.py     # Ollama API client
 ├── requirements.txt     # Python dependencies
-├── README.md           # This file
-└── static/             # Frontend files
-    ├── index.html      # Main UI
-    ├── app.js          # Frontend JavaScript
-    └── styles.css      # Styles
+├── README.md
+└── static/
+    ├── index.html       # Web UI
+    ├── app.js           # Frontend JavaScript
+    └── styles.css       # Styles
 ```
 
 ## Configuration
 
-- **Ollama URL**: Defaults to `http://localhost:11434`. Can be changed in `ollama_client.py`
-- **Project Root**: Defaults to current working directory. Can be changed in `main.py` when initializing `ContextBuilder`
-- **Server Port**: Defaults to 8000. Change in `main.py` or via uvicorn command
-
-## Notes
-
-- The context builder automatically ignores common directories like `.git`, `__pycache__`, `node_modules`, etc.
-- Large files (>100KB) are skipped to prevent context overflow
-- Directory tree depth is limited to 3 levels by default
-- No authentication is implemented - this is intended for local use only
+- **Ollama URL**: Defaults to `http://localhost:11434` (change in `ollama_client.py`)
+- **Server Port**: Defaults to 8000 (change in `main.py` or set `PORT` env var)
+- **Auto-open browser**: Set `AUTO_OPEN_BROWSER=0` to disable
 
 ## Troubleshooting
 
-- **No models available**: Make sure Ollama is running (`ollama list` should show models)
-- **Connection errors**: Verify Ollama is accessible at `http://localhost:11434`
-- **File not found**: Ensure file paths are relative to the project root directory
-- **Port already in use**: Change the port in `main.py` or use `--port` with uvicorn
+- **No models available**: Make sure Ollama is running (`ollama list`)
+- **Connection errors**: Verify Ollama is at `http://localhost:11434`
+- **Port in use**: Set a different port with `PORT=8001 python main.py`
 
+## License
+
+MIT

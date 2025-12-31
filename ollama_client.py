@@ -138,20 +138,25 @@ class OllamaClient:
         # Create a client with longer timeout for downloads
         download_client = httpx.AsyncClient(timeout=3600.0)  # 1 hour timeout
         try:
-            response = await download_client.post(
+            # Use stream context manager for proper streaming
+            async with download_client.stream(
+                "POST",
                 f"{self.base_url}/api/pull",
-                json={"name": model},
-                stream=True
-            )
-            response.raise_for_status()
-            
-            async for line in response.aiter_lines():
-                if line:
-                    try:
-                        data = json.loads(line)
-                        yield data
-                    except json.JSONDecodeError:
-                        continue
+                json={"name": model}
+            ) as response:
+                response.raise_for_status()
+                
+                async for line in response.aiter_lines():
+                    if line:
+                        try:
+                            data = json.loads(line)
+                            yield data
+                        except json.JSONDecodeError:
+                            continue
+        except httpx.HTTPStatusError as e:
+            yield {"error": f"HTTP {e.response.status_code}: {e.response.text}", "status": "error"}
+        except httpx.RequestError as e:
+            yield {"error": f"Connection error: {str(e)}", "status": "error"}
         except Exception as e:
             yield {"error": str(e), "status": "error"}
         finally:

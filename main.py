@@ -1,5 +1,5 @@
 """
-FastAPI server providing OpenAI-compatible endpoints for local LLM coding assistant.
+FastAPI server providing OpenAI-compatible endpoints for OllamaChat.
 Connects to Ollama and supports project-aware context injection.
 """
 from fastapi import FastAPI, HTTPException, Request
@@ -11,9 +11,11 @@ from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
 import json
 import os
+import threading
+import time
+import webbrowser
 
 from ollama_client import OllamaClient
-from context_builder import ContextBuilder
 
 
 @asynccontextmanager
@@ -25,7 +27,7 @@ async def lifespan(app: FastAPI):
     await ollama_client.close()
 
 
-app = FastAPI(title="Local LLM Coding Assistant", lifespan=lifespan)
+app = FastAPI(title="OllamaChat", lifespan=lifespan)
 
 # CORS middleware to allow frontend to connect
 app.add_middleware(
@@ -38,7 +40,6 @@ app.add_middleware(
 
 # Initialize clients
 ollama_client = OllamaClient()
-context_builder = ContextBuilder()
 
 # Mount static files (frontend)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -52,22 +53,33 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class UploadedFile(BaseModel):
+    filename: str
+    content: str
+
+
 class ChatCompletionRequest(BaseModel):
     model: str
     messages: List[ChatMessage]
     stream: Optional[bool] = False
     temperature: Optional[float] = 0.7
-    # Custom fields for context injection
-    project_root: Optional[str] = None
-    selected_files: Optional[List[str]] = None
-    include_readme: Optional[bool] = True
-    include_tree: Optional[bool] = True
-    include_all_files: Optional[bool] = False
     system_prompt: Optional[str] = None
+    # Files uploaded by user (filename + content)
+    uploaded_files: Optional[List[UploadedFile]] = None
 
 
-class FileListRequest(BaseModel):
-    files: List[str]
+@app.get("/favicon.ico")
+async def favicon():
+    """Handle favicon requests to avoid 404 errors."""
+    from fastapi.responses import Response
+    return Response(status_code=204)  # No Content
+
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json")
+async def chrome_devtools():
+    """Handle Chrome DevTools requests to avoid 404 errors."""
+    from fastapi.responses import Response
+    return Response(status_code=204)  # No Content
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -76,7 +88,7 @@ async def root():
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return HTMLResponse("<h1>Local LLM Coding Assistant</h1><p>Frontend not found. Please check static/index.html</p>")
+    return HTMLResponse("<h1>OllamaChat</h1><p>Frontend not found. Please check static/index.html</p>")
 
 
 @app.get("/v1/models")
@@ -84,31 +96,101 @@ async def list_models():
     """
     List available models (OpenAI-compatible endpoint).
     """
-    models = await ollama_client.list_models()
-    return {
-        "object": "list",
-        "data": models
-    }
+    try:
+        models = await ollama_client.list_models()
+        return {
+            "object": "list",
+            "data": models
+        }
+    except Exception as e:
+        print(f"Error listing models: {e}")
+        # Return empty list instead of failing
+        return {
+            "object": "list",
+            "data": []
+        }
 
 
 @app.get("/api/models/recommended")
 async def get_recommended_models():
     """
-    Get list of recommended coding models.
+    Get list of popular models from Ollama library.
     """
     return {
         "models": [
-            {"id": "qwen2.5-coder:7b", "name": "Qwen2.5 Coder 7B", "size": "~4.4GB", "recommended": True},
-            {"id": "qwen2.5-coder:32b", "name": "Qwen2.5 Coder 32B", "size": "~18GB", "recommended": False},
-            {"id": "deepseek-coder:6.7b", "name": "DeepSeek Coder 6.7B", "size": "~3.8GB", "recommended": True},
-            {"id": "deepseek-coder:33b", "name": "DeepSeek Coder 33B", "size": "~18GB", "recommended": False},
-            {"id": "codellama:7b", "name": "CodeLlama 7B", "size": "~3.8GB", "recommended": True},
-            {"id": "codellama:13b", "name": "CodeLlama 13B", "size": "~7.3GB", "recommended": False},
-            {"id": "codellama:34b", "name": "CodeLlama 34B", "size": "~19GB", "recommended": False},
-            {"id": "starcoder2:15b", "name": "StarCoder2 15B", "size": "~8.5GB", "recommended": False},
-            {"id": "wizardcoder:7b", "name": "WizardCoder 7B", "size": "~3.8GB", "recommended": True},
+            # Chat / General
+            {"id": "llama3.2:3b", "name": "Llama 3.2 3B", "size": "~2GB", "category": "chat"},
+            {"id": "llama3.2:1b", "name": "Llama 3.2 1B", "size": "~1.3GB", "category": "chat"},
+            {"id": "llama3.1:8b", "name": "Llama 3.1 8B", "size": "~4.7GB", "category": "chat"},
+            {"id": "llama3.1:70b", "name": "Llama 3.1 70B", "size": "~40GB", "category": "chat"},
+            {"id": "gemma2:9b", "name": "Gemma 2 9B", "size": "~5.4GB", "category": "chat"},
+            {"id": "gemma2:27b", "name": "Gemma 2 27B", "size": "~16GB", "category": "chat"},
+            {"id": "mistral:7b", "name": "Mistral 7B", "size": "~4.1GB", "category": "chat"},
+            {"id": "mixtral:8x7b", "name": "Mixtral 8x7B", "size": "~26GB", "category": "chat"},
+            {"id": "phi3:mini", "name": "Phi-3 Mini", "size": "~2.2GB", "category": "chat"},
+            {"id": "phi3:medium", "name": "Phi-3 Medium", "size": "~7.9GB", "category": "chat"},
+            {"id": "qwen2.5:7b", "name": "Qwen 2.5 7B", "size": "~4.4GB", "category": "chat"},
+            {"id": "qwen2.5:14b", "name": "Qwen 2.5 14B", "size": "~8.9GB", "category": "chat"},
+            {"id": "qwen2.5:32b", "name": "Qwen 2.5 32B", "size": "~19GB", "category": "chat"},
+            # Coding
+            {"id": "qwen2.5-coder:7b", "name": "Qwen 2.5 Coder 7B", "size": "~4.4GB", "category": "code"},
+            {"id": "qwen2.5-coder:14b", "name": "Qwen 2.5 Coder 14B", "size": "~8.9GB", "category": "code"},
+            {"id": "qwen2.5-coder:32b", "name": "Qwen 2.5 Coder 32B", "size": "~19GB", "category": "code"},
+            {"id": "deepseek-coder-v2:16b", "name": "DeepSeek Coder V2 16B", "size": "~8.9GB", "category": "code"},
+            {"id": "codellama:7b", "name": "CodeLlama 7B", "size": "~3.8GB", "category": "code"},
+            {"id": "codellama:13b", "name": "CodeLlama 13B", "size": "~7.3GB", "category": "code"},
+            {"id": "starcoder2:7b", "name": "StarCoder2 7B", "size": "~4GB", "category": "code"},
+            # Vision
+            {"id": "llava:7b", "name": "LLaVA 7B", "size": "~4.7GB", "category": "vision"},
+            {"id": "llava:13b", "name": "LLaVA 13B", "size": "~8GB", "category": "vision"},
+            {"id": "llava-llama3:8b", "name": "LLaVA Llama3 8B", "size": "~5GB", "category": "vision"},
+            # Embedding
+            {"id": "nomic-embed-text", "name": "Nomic Embed Text", "size": "~274MB", "category": "embedding"},
+            {"id": "mxbai-embed-large", "name": "MXBai Embed Large", "size": "~670MB", "category": "embedding"},
         ]
     }
+
+
+@app.get("/api/models/search")
+async def search_models(q: str = ""):
+    """
+    Search through available models (local + library).
+    """
+    query = q.lower().strip()
+    
+    # Get local models
+    local_models = await ollama_client.list_models()
+    local_ids = {m["id"] for m in local_models}
+    
+    # Get recommended/library models
+    recommended = (await get_recommended_models())["models"]
+    
+    results = []
+    
+    # Add matching local models first
+    for model in local_models:
+        if not query or query in model["id"].lower():
+            results.append({
+                "id": model["id"],
+                "name": model["id"],
+                "size": "",
+                "category": "local",
+                "downloaded": True
+            })
+    
+    # Add matching library models (not already local)
+    for model in recommended:
+        if model["id"] not in local_ids:
+            if not query or query in model["id"].lower() or query in model["name"].lower():
+                results.append({
+                    "id": model["id"],
+                    "name": model["name"],
+                    "size": model["size"],
+                    "category": model["category"],
+                    "downloaded": False
+                })
+    
+    return {"results": results[:20], "query": q}
 
 
 class PullModelRequest(BaseModel):
@@ -120,8 +202,6 @@ async def pull_model(request: PullModelRequest):
     Pull/download a model from Ollama.
     Returns streaming progress updates.
     """
-    from fastapi.responses import StreamingResponse
-    
     async def generate():
         try:
             async for progress in ollama_client.pull_model(request.model):
@@ -143,7 +223,7 @@ async def pull_model(request: PullModelRequest):
     )
 
 
-@app.get("/api/models/check/{model}")
+@app.get("/api/models/check/{model:path}")
 async def check_model(model: str):
     """
     Check if a model is downloaded.
@@ -156,7 +236,7 @@ async def check_model(model: str):
 async def chat_completions(request: ChatCompletionRequest):
     """
     Create a chat completion (OpenAI-compatible endpoint).
-    Supports project context injection via project_root, selected_files, include_readme, include_tree.
+    Supports file uploads for context.
     """
     import traceback
     
@@ -169,90 +249,64 @@ async def chat_completions(request: ChatCompletionRequest):
         if not request.messages or len(request.messages) == 0:
             raise HTTPException(status_code=400, detail="At least one message is required")
         
-        # Use provided project root or default
-        try:
-            if request.project_root:
-                # Create a new context builder with the specified project root
-                builder = ContextBuilder(project_root=request.project_root)
-            else:
-                builder = context_builder
-        except Exception as e:
-            print(f"Error creating context builder: {e}")
-            print(traceback.format_exc())
-            raise HTTPException(status_code=500, detail=f"Error setting up context builder: {str(e)}")
-        
-        # Build context if files are selected or context options enabled
+        # Build file context from uploaded files
         context_parts = []
-        context_info = {
-            "project_root": str(builder.project_root),
-            "included_items": []
-        }
+        context_info = {"included_files": []}
         
-        try:
-            if request.include_tree or request.include_readme or request.selected_files or request.include_all_files:
-                context = builder.build_context(
-                    selected_files=request.selected_files or [],
-                    include_readme=request.include_readme,
-                    include_tree=request.include_tree,
-                    include_all_files=request.include_all_files
-                )
-                if context:
-                    context_parts.append(context)
-                    if request.include_tree:
-                        context_info["included_items"].append("directory_tree")
-                    if request.include_readme:
-                        context_info["included_items"].append("README.md")
-                    if request.include_all_files:
-                        try:
-                            all_files = builder.get_all_files(text_only=True)
-                            context_info["included_items"].append(f"all_files ({len(all_files)} text files)")
-                        except Exception as e:
-                            print(f"Warning: Could not get all files: {e}")
-                            context_info["included_items"].append("all_files (scan failed)")
-                    elif request.selected_files:
-                        context_info["included_items"].extend(request.selected_files)
-        except Exception as e:
-            # Log context building errors but don't fail the request
-            print(f"Warning: Error building context: {e}")
-            # Continue without context rather than failing
+        if request.uploaded_files:
+            file_context = "## Uploaded Files\n"
+            for uploaded_file in request.uploaded_files:
+                # Detect language from extension
+                ext = uploaded_file.filename.split('.')[-1].lower() if '.' in uploaded_file.filename else ''
+                lang_map = {
+                    "py": "python", "js": "javascript", "ts": "typescript",
+                    "html": "html", "css": "css", "json": "json", "md": "markdown",
+                    "rs": "rust", "go": "go", "java": "java", "cpp": "cpp",
+                    "c": "c", "sh": "bash", "yaml": "yaml", "yml": "yaml",
+                    "xml": "xml", "sql": "sql", "txt": ""
+                }
+                lang = lang_map.get(ext, "")
+                lang_prefix = lang + "\n" if lang else ""
+                file_context += f"### {uploaded_file.filename}\n```{lang_prefix}{uploaded_file.content}\n```\n\n"
+                context_info["included_files"].append(uploaded_file.filename)
+            context_parts.append(file_context)
         
         # Prepare messages
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        
-        # Default system prompt for coding assistance
-        default_system_prompt = """You are a helpful coding assistant. You have access to the user's project files and context provided below. 
+
+        # Default system prompt
+        default_system_prompt = """You are a helpful assistant. 
 
 When answering questions:
-- Reference specific files and line numbers when relevant
-- Provide clear, working code examples
+- Be clear and concise
+- Provide working code examples when relevant
 - Explain your reasoning
-- If you see project files in the context, use them to give specific answers
 
-Do NOT say you cannot access files - the file contents are provided to you in the context below."""
-        
-        # Inject system prompt
+If files are provided below, you can reference and analyze them."""
+
+        # Build system prompt
         if request.system_prompt:
             system_content = request.system_prompt
         else:
             system_content = default_system_prompt
-        
+
         if context_parts:
-            system_content += "\n\n## Project Context\n" + "\n".join(context_parts)
-        
+            system_content += "\n\n" + "\n".join(context_parts)
+
         messages.insert(0, {"role": "system", "content": system_content})
-        
-        # Store context info for debugging (will be returned in response)
+
+        # Store context info for debugging
         context_info["context_length"] = sum(len(part) for part in context_parts)
         context_info["message_count"] = len(messages)
-        
-        # Call Ollama
+        temperature = request.temperature if request.temperature is not None else 0.7
+
+        # Handle streaming vs non-streaming
         if request.stream:
-            # Streaming response
             stream_gen = await ollama_client.chat_completion(
                 model=request.model,
                 messages=messages,
                 stream=True,
-                temperature=request.temperature
+                temperature=temperature
             )
             
             async def generate():
@@ -277,7 +331,7 @@ Do NOT say you cannot access files - the file contents are provided to you in th
                                             }]
                                         }
                                         yield f"data: {json.dumps(chunk)}\n\n"
-                                
+
                                 if data.get("done", False):
                                     # Send final chunk
                                     final_chunk = {
@@ -296,30 +350,28 @@ Do NOT say you cannot access files - the file contents are provided to you in th
                             except json.JSONDecodeError:
                                 continue
                 except Exception as e:
-                    # Send error in stream
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            
+
             return StreamingResponse(generate(), media_type="text/event-stream")
         else:
-            # Non-streaming response
             response = await ollama_client.chat_completion(
                 model=request.model,
                 messages=messages,
                 stream=False,
-                temperature=request.temperature
+                temperature=temperature
             )
-            # Add context info to response for debugging
+
             if isinstance(response, dict):
                 response["context_info"] = context_info
+
             return response
+            
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
         error_trace = traceback.format_exc()
         print(f"Error in chat_completions: {e}")
         print(error_trace)
-        # Return a more helpful error message
         error_msg = str(e)
         if "connect" in error_msg.lower() or "connection" in error_msg.lower():
             error_msg = f"Could not connect to Ollama. Make sure Ollama is running at http://localhost:11434. Original error: {error_msg}"
@@ -328,36 +380,17 @@ Do NOT say you cannot access files - the file contents are provided to you in th
         raise HTTPException(status_code=500, detail=error_msg)
 
 
-@app.post("/api/context/files")
-async def get_file_contents(request: FileListRequest, project_root: Optional[str] = None):
-    """
-    Get contents of multiple files.
-    Used by frontend to preview files before adding to context.
-    """
-    builder = ContextBuilder(project_root=project_root) if project_root else context_builder
-    results = {}
-    for file_path in request.files:
-        content = builder.read_file(file_path)
-        results[file_path] = content
-    return results
-
-
-@app.get("/api/context/tree")
-async def get_directory_tree(project_root: Optional[str] = None):
-    """Get directory tree representation."""
-    builder = ContextBuilder(project_root=project_root) if project_root else context_builder
-    return {"tree": builder.get_directory_tree()}
-
-
-@app.get("/api/context/readme")
-async def get_readme(project_root: Optional[str] = None):
-    """Get README.md contents."""
-    builder = ContextBuilder(project_root=project_root) if project_root else context_builder
-    readme = builder.get_readme()
-    return {"readme": readme}
-
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    host = "127.0.0.1"
+    port = int(os.getenv("PORT", "8000"))
+    auto_open = os.getenv("AUTO_OPEN_BROWSER", "1").lower() not in ("0", "false", "no")
 
+    if auto_open:
+        def open_browser():
+            cache_bust = int(time.time())
+            webbrowser.open_new(f"http://{host}:{port}/?t={cache_bust}")
+
+        threading.Timer(1.0, open_browser).start()
+
+    uvicorn.run(app, host=host, port=port)

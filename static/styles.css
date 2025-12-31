@@ -104,6 +104,103 @@ select:focus {
     border-color: #007acc;
 }
 
+.model-tools {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#model-search {
+    flex: 1;
+    padding: 6px 10px;
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+#model-search:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+.model-link {
+    color: #4ec9b0;
+    text-decoration: underline;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.preset-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.preset-btn {
+    padding: 6px 12px;
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.preset-btn:hover {
+    background-color: #444;
+}
+
+.preset-btn.active {
+    background-color: #4ec9b0;
+    color: #1e1e1e;
+    border-color: #4ec9b0;
+}
+
+.model-pull {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+#model-pull-input {
+    flex: 1;
+    padding: 6px 10px;
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+#model-pull-input:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+input[type="number"] {
+    padding: 8px;
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+input[type="number"]:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
 input[type="checkbox"] {
     margin-right: 5px;
 }
@@ -167,6 +264,20 @@ input[type="checkbox"] {
 }
 
 #file-input:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+#backtest-data-path {
+    padding: 8px;
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+#backtest-data-path:focus {
     outline: none;
     border-color: #007acc;
 }
@@ -421,5 +532,133 @@ button:disabled {
     font-size: 11px;
     color: #888;
     font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* Search Results Dropdown */
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #2d2d30;
+    border: 1px solid #555;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.control-group {
+    position: relative;
+}
+
+.search-result-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #3e3e3e;
+    transition: background-color 0.15s;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background-color: #3c3c3c;
+}
+
+.search-result-item.downloaded {
+    background-color: rgba(78, 201, 176, 0.1);
+}
+
+.search-result-item.downloaded:hover {
+    background-color: rgba(78, 201, 176, 0.2);
+}
+
+.search-result-item.no-results {
+    cursor: default;
+    color: #888;
+    font-style: italic;
+}
+
+.search-result-item .model-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.search-result-item .model-info strong {
+    color: #d4d4d4;
+    font-size: 13px;
+}
+
+.search-result-item .model-size {
+    color: #888;
+    font-size: 11px;
+}
+
+.search-result-item .model-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background-color: #555;
+    color: #ccc;
+}
+
+.badge.downloaded {
+    background-color: #4ec9b0;
+    color: #1e1e1e;
+}
+
+.badge.category {
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    text-transform: capitalize;
+}
+
+/* File Upload */
+#file-upload {
+    padding: 8px;
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 13px;
+    width: 100%;
+}
+
+#file-upload::file-selector-button {
+    padding: 6px 12px;
+    background-color: #007acc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+#file-upload::file-selector-button:hover {
+    background-color: #005a9e;
+}
+
+.file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+#uploaded-files-list .file-tag {
+    background-color: #264f78;
 }
 

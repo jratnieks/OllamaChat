@@ -24,6 +24,9 @@ Thumbs.db
 *.log
 .pytest_cache/
 .mypy_cache/
+data/
+strategy_tools.py
+context_builder.py
 
 # Environment variables
 .env

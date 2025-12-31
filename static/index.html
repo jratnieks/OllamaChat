@@ -3,78 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local LLM Coding Assistant</title>
+    <title>OllamaChat</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Local LLM Coding Assistant</h1>
+            <h1>OllamaChat</h1>
         </header>
         
         <div class="main-layout">
             <div class="left-panel">
                 <div class="section">
-                    <h2>Configuration</h2>
+                    <h2>Model</h2>
                     
                     <div class="control-group">
-                        <label for="model-select">Model:</label>
+                        <label for="model-search">Search Ollama Models:</label>
+                        <input type="text" id="model-search" placeholder="Search models (e.g., llama, codellama, phi)..." autocomplete="off">
+                        <div id="model-search-results" class="search-results"></div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="model-select">Selected Model:</label>
                         <select id="model-select">
                             <option value="">Loading models...</option>
                         </select>
-                        <small class="hint" id="model-hint">Models must be downloaded in Ollama first. See README for instructions.</small>
+                        <small class="hint" id="model-hint">Select a model or search above to find more.</small>
                         <div id="no-models-message" style="display: none; margin-top: 8px; padding: 8px; background-color: #3c3c3c; border-radius: 4px; font-size: 12px;">
                             <strong>No models found.</strong> Download a model first:
-                            <code style="display: block; margin-top: 4px; padding: 4px; background-color: #1e1e1e; border-radius: 2px;">ollama pull qwen2.5-coder:7b</code>
+                            <code style="display: block; margin-top: 4px; padding: 4px; background-color: #1e1e1e; border-radius: 2px;">ollama pull llama3.2:3b</code>
                             <a href="#" id="refresh-models" style="color: #4ec9b0; text-decoration: underline; cursor: pointer; margin-top: 4px; display: inline-block;">Refresh</a>
                         </div>
                     </div>
                     
                     <div class="control-group">
-                        <label for="project-folder">Project Folder:</label>
-                        <div class="folder-input-group">
-                            <input type="text" id="project-folder" placeholder="Enter project folder path (e.g., C:\Projects\MyApp)" autocomplete="off">
-                            <input type="file" id="folder-picker" webkitdirectory directory style="display: none;">
-                            <button id="browse-folder-btn" type="button">Browse</button>
+                        <label>Pull Model by Name:</label>
+                        <div class="model-pull">
+                            <input type="text" id="model-pull-input" placeholder="e.g., llama3.2:3b, phi3:mini">
+                            <button id="model-pull-btn" type="button">Pull</button>
                         </div>
-                        <small class="hint">Leave empty to use current directory. Click Browse to select a folder, or paste the path directly.</small>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label>
-                            <input type="checkbox" id="include-readme" checked>
-                            Include README.md
-                        </label>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label>
-                            <input type="checkbox" id="include-tree" checked>
-                            Include directory tree
-                        </label>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label>
-                            <input type="checkbox" id="include-all-files">
-                            Include all files in project folder
-                        </label>
+                        <small class="hint">Enter any model name from <a href="https://ollama.com/library" target="_blank" rel="noopener">ollama.com/library</a></small>
                     </div>
                 </div>
-                
+
                 <div class="section">
                     <h2>System Prompt</h2>
-                    <textarea id="system-prompt" placeholder="Optional: Override the default coding assistant prompt. Leave empty to use the default."></textarea>
-                    <small class="hint">Default prompt tells the model to be a helpful coding assistant with access to your project files.</small>
-                </div>
-                
-                <div class="section">
-                    <h2>Selected Files</h2>
-                    <div class="file-input-group">
-                        <input type="text" id="file-input" placeholder="Enter file path (e.g., src/main.py)">
-                        <button id="add-file-btn">Add</button>
+                    <textarea id="system-prompt" placeholder="Optional: Customize the assistant's behavior. Leave empty for default."></textarea>
+                    <small class="hint">Customize how the assistant responds.</small>
+                    <div class="control-group" style="margin-top: 10px;">
+                        <label>Presets:</label>
+                        <div class="preset-group">
+                            <button type="button" class="preset-btn" data-preset="general">General</button>
+                            <button type="button" class="preset-btn" data-preset="coding">Coding</button>
+                            <button type="button" class="preset-btn" data-preset="creative">Creative</button>
+                            <button type="button" class="preset-btn" data-preset="clear">Clear</button>
+                        </div>
                     </div>
-                    <div id="selected-files-list"></div>
+                </div>
+
+                <div class="section">
+                    <h2>File Upload</h2>
+                    <div class="control-group">
+                        <label for="file-upload">Upload files for the LLM to analyze:</label>
+                        <input type="file" id="file-upload" multiple accept=".txt,.py,.js,.ts,.json,.md,.html,.css,.yaml,.yml,.xml,.sql,.sh,.c,.cpp,.java,.go,.rs,.toml">
+                        <small class="hint">Supported: text, code, config files (max 100KB each)</small>
+                    </div>
+                    <div id="uploaded-files-list" class="file-list"></div>
                 </div>
             </div>
             
@@ -89,15 +83,15 @@
                 
                 <div class="debug-panel">
                     <div class="debug-header">
-                        <h3>Debug: What the LLM sees</h3>
+                        <h3>Debug Info</h3>
                         <button id="toggle-debug">Hide</button>
                     </div>
                     <div id="debug-content" class="debug-content">
                         <div class="debug-item">
-                            <strong>Project Root:</strong> <span id="debug-project-root">-</span>
+                            <strong>Selected Model:</strong> <span id="debug-model">-</span>
                         </div>
                         <div class="debug-item">
-                            <strong>Included Items:</strong> <span id="debug-included">-</span>
+                            <strong>Uploaded Files:</strong> <span id="debug-files">-</span>
                         </div>
                         <div class="debug-item">
                             <strong>Context Length:</strong> <span id="debug-context-length">-</span>
@@ -106,17 +100,12 @@
                             <strong>System Prompt:</strong>
                             <pre id="debug-system-prompt">-</pre>
                         </div>
-                        <div class="debug-item">
-                            <strong>Full Context Preview:</strong>
-                            <pre id="debug-context-preview">-</pre>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=10"></script>
 </body>
 </html>
-
